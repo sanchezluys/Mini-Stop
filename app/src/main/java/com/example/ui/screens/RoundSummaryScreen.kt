@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -177,7 +177,7 @@ fun RoundSummaryScreen(
             if (uiState.isHost) {
                 SleekButton(
                     text = "SIGUIENTE RONDA (${uiState.currentRoundNumber + 1}/${uiState.gameConfig.totalRounds})",
-                    icon = Icons.Default.ArrowForward,
+                    icon = Icons.AutoMirrored.Filled.ArrowForward,
                     onClick = onNextRoundClick,
                     modifier = Modifier.testTag("next_round_button")
                 )

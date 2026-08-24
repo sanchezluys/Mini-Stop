@@ -66,6 +66,7 @@ class SoundEffects(private val context: Context) {
         } catch (_: Exception) {}
     }
 
+    @androidx.annotation.RequiresPermission(android.Manifest.permission.VIBRATE)
     private fun vibrate(millis: Long) {
         try {
             val vibrator = getVibrator() ?: return
@@ -78,6 +79,7 @@ class SoundEffects(private val context: Context) {
         } catch (_: Exception) {}
     }
 
+    @androidx.annotation.RequiresPermission(android.Manifest.permission.VIBRATE)
     private fun vibrateLong() {
         try {
             val vibrator = getVibrator() ?: return
