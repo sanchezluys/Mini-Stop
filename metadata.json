@@ -1,0 +1,6 @@
+{
+  "name": "Stop!",
+  "description": "Juego multijugador minimalista de Stop (Basta / Tutti Frutti) en red local para hasta 6 jugadores con votación y marcador en tiempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
