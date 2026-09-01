@@ -66,6 +66,13 @@ class SoundEffects(private val context: Context) {
         } catch (_: Exception) {}
     }
 
+    fun playLaughReaction() {
+        try {
+            toneGenerator?.startTone(ToneGenerator.TONE_SUP_RINGTONE, 200)
+            vibrate(60)
+        } catch (_: Exception) {}
+    }
+
     @androidx.annotation.RequiresPermission(android.Manifest.permission.VIBRATE)
     private fun vibrate(millis: Long) {
         try {

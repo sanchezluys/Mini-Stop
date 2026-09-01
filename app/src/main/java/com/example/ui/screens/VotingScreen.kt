@@ -15,10 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -46,12 +45,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AnswerScoreType
+import com.example.ui.components.PlayerAvatar
 import com.example.ui.components.SleekButton
-import com.example.ui.theme.OutlineColor
 import com.example.ui.theme.PlayerColors
-import com.example.ui.theme.PrimaryContainer
-import com.example.ui.theme.PrimaryPurple
-import com.example.ui.theme.StopRed
 import com.example.ui.theme.SuccessGreen
 import com.example.viewmodel.StopUiState
 
@@ -59,6 +55,7 @@ import com.example.viewmodel.StopUiState
 fun VotingScreen(
     uiState: StopUiState,
     onScoreChange: (playerId: String, category: String, scoreType: AnswerScoreType) -> Unit,
+    onLaughClick: (playerId: String, category: String) -> Unit,
     onFinishVotingClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -95,7 +92,7 @@ fun VotingScreen(
                         )
                         Card(
                             shape = RoundedCornerShape(100.dp),
-                            colors = CardDefaults.cardColors(containerColor = PrimaryContainer)
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                         ) {
                             Text(
                                 text = "Letra ${uiState.currentLetter}",
@@ -108,7 +105,7 @@ fun VotingScreen(
                     }
 
                     Text(
-                        text = "Toca para calificar: +100 (Única), +50 (Repetida) o 0 (Nula)",
+                        text = "Califica las palabras y vota con 😂 por las más graciosas",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
@@ -121,7 +118,7 @@ fun VotingScreen(
                 selectedTabIndex = selectedCategoryIndex,
                 edgePadding = 16.dp,
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = PrimaryPurple,
+                contentColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 categories.forEachIndexed { index, cat ->
@@ -150,48 +147,53 @@ fun VotingScreen(
                     val submission = uiState.allRoundSubmissions.find { it.playerId == player.id }
                     val answerText = submission?.answers?.get(currentCategory)?.trim() ?: ""
                     val currentScoreType = uiState.votingScores[player.id]?.get(currentCategory) ?: AnswerScoreType.INVALID
-                    val avatarColor = PlayerColors.getOrElse(player.colorIndex) { PrimaryPurple }
+                    val avatarColor = PlayerColors.getOrElse(player.colorIndex) { MaterialTheme.colorScheme.primary }
+
+                    val isOwnWord = player.id == uiState.localPlayer.id
+                    val laughVoters = uiState.roundLaughVotes[player.id]?.get(currentCategory) ?: emptyList()
+                    val laughCount = laughVoters.size
+                    val hasMyLaughVote = laughVoters.contains(uiState.localPlayer.id)
 
                     Card(
                         shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, OutlineColor, RoundedCornerShape(18.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(18.dp))
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(14.dp)
                         ) {
-                            // Player Info & Word
+                            // Player Info & Points Preview Badge
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(avatarColor),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = player.name.take(2).uppercase(),
-                                            color = Color.White,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
+                                    PlayerAvatar(player = player, size = 32.dp)
                                     Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = player.name,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
+                                    Column {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = player.name,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            if (isOwnWord) {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "(Tú)",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
 
                                 // Points preview badge
@@ -200,8 +202,8 @@ fun VotingScreen(
                                     colors = CardDefaults.cardColors(
                                         containerColor = when (currentScoreType) {
                                             AnswerScoreType.UNIQUE -> SuccessGreen.copy(alpha = 0.15f)
-                                            AnswerScoreType.REPEATED -> PrimaryPurple.copy(alpha = 0.15f)
-                                            AnswerScoreType.INVALID -> StopRed.copy(alpha = 0.15f)
+                                            AnswerScoreType.REPEATED -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                                            AnswerScoreType.INVALID -> MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
                                         }
                                     )
                                 ) {
@@ -211,8 +213,8 @@ fun VotingScreen(
                                         fontWeight = FontWeight.ExtraBold,
                                         color = when (currentScoreType) {
                                             AnswerScoreType.UNIQUE -> SuccessGreen
-                                            AnswerScoreType.REPEATED -> PrimaryPurple
-                                            AnswerScoreType.INVALID -> StopRed
+                                            AnswerScoreType.REPEATED -> MaterialTheme.colorScheme.secondary
+                                            AnswerScoreType.INVALID -> MaterialTheme.colorScheme.error
                                         },
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
@@ -259,7 +261,7 @@ fun VotingScreen(
                                     label = "+50 (Repetida)",
                                     icon = Icons.Default.Repeat,
                                     isSelected = currentScoreType == AnswerScoreType.REPEATED,
-                                    selectedColor = PrimaryPurple,
+                                    selectedColor = MaterialTheme.colorScheme.secondary,
                                     onClick = { onScoreChange(player.id, currentCategory, AnswerScoreType.REPEATED) },
                                     modifier = Modifier.weight(1f)
                                 )
@@ -269,10 +271,96 @@ fun VotingScreen(
                                     label = "0 (Nula)",
                                     icon = Icons.Default.Close,
                                     isSelected = currentScoreType == AnswerScoreType.INVALID,
-                                    selectedColor = StopRed,
+                                    selectedColor = MaterialTheme.colorScheme.error,
                                     onClick = { onScoreChange(player.id, currentCategory, AnswerScoreType.INVALID) },
                                     modifier = Modifier.weight(1f)
                                 )
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // --- LAUGH EMOJI VOTING ROW ---
+                            if (isOwnWord) {
+                                // Owner cannot vote for own word: display badge with received laugh votes
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (laughCount > 0) Color(0xFFFEF3C7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = "😂",
+                                                fontSize = 15.sp
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = if (laughCount > 0) "$laughCount ${if (laughCount == 1) "risa recibida" else "risas recibidas"}" else "0 risas",
+                                                fontSize = 12.sp,
+                                                fontWeight = if (laughCount > 0) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (laughCount > 0) Color(0xFF92400E) else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+
+                                        Text(
+                                            text = "Tu palabra (votan los demás)",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Normal,
+                                            color = if (laughCount > 0) Color(0xFFB45309) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                            } else {
+                                // Non-owners can vote with laugh emoji 😂
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (hasMyLaughVote) Color(0xFFFEF3C7) else MaterialTheme.colorScheme.surfaceVariant,
+                                    border = if (hasMyLaughVote) androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFF59E0B)) else null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable { onLaughClick(player.id, currentCategory) }
+                                        .testTag("laugh_vote_btn_${player.id}")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = "😂",
+                                                fontSize = 16.sp
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = if (hasMyLaughVote) "¡Me dio risa esta respuesta!" else "¿Te dio risa esta palabra?",
+                                                fontSize = 12.sp,
+                                                fontWeight = if (hasMyLaughVote) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (hasMyLaughVote) Color(0xFF92400E) else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+
+                                        Card(
+                                            shape = RoundedCornerShape(100.dp),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (hasMyLaughVote) Color(0xFFF59E0B) else MaterialTheme.colorScheme.surface
+                                            )
+                                        ) {
+                                            Text(
+                                                text = if (laughCount > 0) "😂 $laughCount" else "+1 😂",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (hasMyLaughVote) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -348,3 +436,4 @@ private fun ScorePillButton(
         }
     }
 }
+

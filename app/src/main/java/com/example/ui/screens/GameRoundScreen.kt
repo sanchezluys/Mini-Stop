@@ -48,13 +48,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.OutlineColor
-import com.example.ui.theme.PrimaryContainer
-import com.example.ui.theme.PrimaryPurple
-import com.example.ui.theme.StopRed
 import com.example.ui.theme.SuccessGreen
 import com.example.viewmodel.StopUiState
 
@@ -102,7 +97,7 @@ fun GameRoundScreen(
                                 modifier = Modifier
                                     .size(44.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(PrimaryPurple),
+                                    .background(MaterialTheme.colorScheme.primary),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -133,7 +128,7 @@ fun GameRoundScreen(
                         Card(
                             shape = RoundedCornerShape(100.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isTimerLow) StopRed else PrimaryContainer
+                                containerColor = if (isTimerLow) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primaryContainer
                             ),
                             modifier = Modifier.testTag("round_timer_badge")
                         ) {
@@ -144,7 +139,7 @@ fun GameRoundScreen(
                                 Icon(
                                     imageVector = Icons.Default.Timer,
                                     contentDescription = null,
-                                    tint = if (isTimerLow) Color.White else PrimaryPurple,
+                                    tint = if (isTimerLow) Color.White else MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -185,7 +180,7 @@ fun GameRoundScreen(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(1.dp, OutlineColor, RoundedCornerShape(16.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
                         ) {
                             Column(
                                 modifier = Modifier
@@ -239,13 +234,13 @@ fun GameRoundScreen(
                                     ),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = if (startsWithLetter) SuccessGreen else PrimaryPurple,
-                                        unfocusedBorderColor = if (startsWithLetter) SuccessGreen.copy(alpha = 0.5f) else OutlineColor
+                                        focusedBorderColor = if (startsWithLetter) SuccessGreen else MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = if (startsWithLetter) SuccessGreen.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant
                                     ),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .testTag("input_$category")
-                                )
+                                 )
                             }
                         }
                     }
@@ -268,7 +263,7 @@ fun GameRoundScreen(
                     onClick = onStopClick,
                     shape = RoundedCornerShape(100.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = StopRed,
+                        containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = Color.White
                     ),
                     modifier = Modifier
@@ -326,7 +321,7 @@ fun GameRoundScreen(
                                 modifier = Modifier
                                     .size(72.dp)
                                     .clip(CircleShape)
-                                    .background(StopRed),
+                                    .background(MaterialTheme.colorScheme.primary),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -343,7 +338,7 @@ fun GameRoundScreen(
                                 text = "¡STOP!",
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.Black,
-                                color = StopRed
+                                color = MaterialTheme.colorScheme.primary
                             )
 
                             Text(
@@ -359,7 +354,7 @@ fun GameRoundScreen(
                                     text = "Finalizando en ${uiState.stopCountdown}...",
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = PrimaryPurple,
+                                    color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(top = 12.dp)
                                 )
                             }
@@ -370,3 +365,4 @@ fun GameRoundScreen(
         }
     }
 }
+

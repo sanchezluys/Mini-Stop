@@ -47,14 +47,65 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
+import coil.compose.AsyncImage
 import com.example.model.Player
-import com.example.ui.theme.OnPrimary
-import com.example.ui.theme.OnPrimaryContainer
-import com.example.ui.theme.OutlineColor
 import com.example.ui.theme.PlayerColors
-import com.example.ui.theme.PrimaryContainer
-import com.example.ui.theme.PrimaryPurple
-import com.example.ui.theme.PrimaryPurpleDark
+
+@Composable
+fun PlayerAvatar(
+    player: Player,
+    size: Dp = 40.dp,
+    modifier: Modifier = Modifier
+) {
+    PlayerAvatar(
+        name = player.name,
+        colorIndex = player.colorIndex,
+        avatarUri = player.avatarUri,
+        size = size,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun PlayerAvatar(
+    name: String,
+    colorIndex: Int,
+    avatarUri: String?,
+    size: Dp = 40.dp,
+    modifier: Modifier = Modifier
+) {
+    val color = PlayerColors.getOrElse(colorIndex) { MaterialTheme.colorScheme.primary }
+    val initials = if (name.isNotBlank()) name.trim().take(2).uppercase() else "TÚ"
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(color),
+        contentAlignment = Alignment.Center
+    ) {
+        if (!avatarUri.isNullOrBlank()) {
+            AsyncImage(
+                model = avatarUri,
+                contentDescription = "Foto de perfil",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+            )
+        } else {
+            Text(
+                text = initials,
+                color = Color.White,
+                fontSize = (size.value * 0.38f).sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
 
 @Composable
 fun RoomCodeBanner(
@@ -64,8 +115,8 @@ fun RoomCodeBanner(
     modifier: Modifier = Modifier
 ) {
     Card(
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = PrimaryContainer),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
         modifier = modifier
             .fillMaxWidth()
             .testTag("room_code_banner")
@@ -85,7 +136,7 @@ fun RoomCodeBanner(
                 Icon(
                     imageVector = Icons.Default.WifiTethering,
                     contentDescription = null,
-                    tint = PrimaryPurple,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -94,7 +145,7 @@ fun RoomCodeBanner(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.2.sp,
-                    color = PrimaryPurple
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -103,7 +154,7 @@ fun RoomCodeBanner(
                 fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = (-0.5).sp,
-                color = OnPrimaryContainer,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
                 textAlign = TextAlign.Center
             )
 
@@ -112,7 +163,7 @@ fun RoomCodeBanner(
                     text = "IP del Host: $hostIp:8888",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
@@ -120,7 +171,7 @@ fun RoomCodeBanner(
             Text(
                 text = subtitle,
                 fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 4.dp)
             )
@@ -137,15 +188,15 @@ fun PlayerSlotCard(
     modifier: Modifier = Modifier
 ) {
     if (player != null) {
-        val color = PlayerColors.getOrElse(player.colorIndex) { PrimaryPurple }
-        val initials = if (isLocal) "YOU" else player.name.take(2).uppercase()
+        val color = PlayerColors.getOrElse(player.colorIndex) { MaterialTheme.colorScheme.primary }
+        val initials = if (isLocal) "TÚ" else player.name.take(2).uppercase()
 
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = modifier
                 .fillMaxWidth()
-                .border(1.dp, OutlineColor, RoundedCornerShape(16.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
                 .testTag("player_card_${player.id}")
         ) {
             Row(
@@ -159,20 +210,7 @@ fun PlayerSlotCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f, fill = false)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(color),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = initials,
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    PlayerAvatar(player = player, size = 36.dp)
 
                     Spacer(modifier = Modifier.width(10.dp))
 
@@ -188,14 +226,14 @@ fun PlayerSlotCard(
                         if (player.isHost) {
                             Text(
                                 text = "Anfitrión",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = PrimaryPurple
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         } else if (player.isBot) {
                             Text(
                                 text = "Bot Virtual",
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -206,13 +244,13 @@ fun PlayerSlotCard(
                 if (onRemoveClick != null && !player.isHost) {
                     IconButton(
                         onClick = onRemoveClick,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Eliminar jugador",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.size(16.dp)
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -223,11 +261,12 @@ fun PlayerSlotCard(
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .height(54.dp)
+                .height(56.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, OutlineColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 .clickable(enabled = onAddBotClick != null) { onAddBotClick?.invoke() }
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 14.dp),
             contentAlignment = Alignment.CenterStart
         ) {
             Row(
@@ -240,21 +279,21 @@ fun PlayerSlotCard(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
-                            .border(1.dp, OutlineColor.copy(alpha = 0.5f), CircleShape),
+                            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.PersonAdd,
                             contentDescription = null,
-                            tint = OutlineColor,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = if (onAddBotClick != null) "+ Añadir Bot" else "Libre",
+                        text = if (onAddBotClick != null) "+ Añadir Bot" else "Espacio disponible",
                         fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -270,9 +309,9 @@ fun SleekCategoryChip(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bgColor = if (isSelected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
-    val borderColor = if (isSelected) PrimaryPurple else OutlineColor
-    val textColor = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+    val bgColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(
         shape = RoundedCornerShape(100.dp),
@@ -290,7 +329,7 @@ fun SleekCategoryChip(
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    tint = PrimaryPurple,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .size(14.dp)
                         .padding(end = 4.dp)
@@ -299,7 +338,7 @@ fun SleekCategoryChip(
             Text(
                 text = name,
                 fontSize = 13.sp,
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = textColor
             )
         }
@@ -313,8 +352,8 @@ fun SleekButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     icon: ImageVector? = null,
-    containerColor: Color = PrimaryPurple,
-    contentColor: Color = OnPrimary
+    containerColor: Color = MaterialTheme.colorScheme.primary,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimary
 ) {
     Button(
         onClick = onClick,
@@ -323,7 +362,7 @@ fun SleekButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = contentColor,
-            disabledContainerColor = containerColor.copy(alpha = 0.4f),
+            disabledContainerColor = containerColor.copy(alpha = 0.35f),
             disabledContentColor = contentColor.copy(alpha = 0.6f)
         ),
         modifier = modifier
@@ -395,3 +434,4 @@ fun NotificationBanner(
         }
     }
 }
+

@@ -2,43 +2,53 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Sleek Interface Theme Colors (Material 3 Purple / Lavender palette)
-val PrimaryPurple = Color(0xFF6750A4)
-val PrimaryPurpleDark = Color(0xFF5A4691)
+// Minimalist Red & Slate Modern Theme Colors
+val PrimaryRed = Color(0xFFDC2626)
+val PrimaryRedDark = Color(0xFFB91C1C)
 val OnPrimary = Color(0xFFFFFFFF)
-val PrimaryContainer = Color(0xFFEADDFF)
-val OnPrimaryContainer = Color(0xFF21005D)
+val PrimaryContainer = Color(0xFFFFEBEE)
+val OnPrimaryContainer = Color(0xFF7F1D1D)
 
-val SecondaryPurple = Color(0xFF625B71)
-val SecondaryContainer = Color(0xFFE8DEF8)
-val OnSecondaryContainer = Color(0xFF1D192B)
+val SecondarySlate = Color(0xFF475569)
+val SecondaryContainer = Color(0xFFF1F5F9)
+val OnSecondaryContainer = Color(0xFF0F172A)
 
-val TertiaryPink = Color(0xFF7D5260)
-val TertiaryContainer = Color(0xFFFFD8E4)
-val OnTertiaryContainer = Color(0xFF31111D)
+val TertiaryIndigo = Color(0xFF4F46E5)
+val TertiaryContainer = Color(0xFFEEF2FF)
+val OnTertiaryContainer = Color(0xFF312E81)
 
-val Background = Color(0xFFFDF7FF)
+val Background = Color(0xFFF8FAFC)
 val Surface = Color(0xFFFFFFFF)
-val SurfaceVariant = Color(0xFFF3EDF7)
-val OnSurface = Color(0xFF1D1B20)
-val OnSurfaceVariant = Color(0xFF49454F)
+val SurfaceVariant = Color(0xFFF1F5F9)
+val OnSurface = Color(0xFF0F172A)
+val OnSurfaceVariant = Color(0xFF64748B)
 
-val OutlineColor = Color(0xFFCAC4D0)
-val OutlineVariant = Color(0xFFE7E0EC)
+val OutlineColor = Color(0xFFE2E8F0)
+val OutlineVariant = Color(0xFFCBD5E1)
 
-val StopRed = Color(0xFFB3261E)
-val StopRedContainer = Color(0xFFF9DEDC)
+// STOP Action & Score Feedback Colors
+val StopRed = Color(0xFFDC2626)
+val StopRedContainer = Color(0xFFFEE2E2)
 val OnStopRed = Color(0xFFFFFFFF)
+val OnStopRedContainer = Color(0xFF7F1D1D)
 
-val SuccessGreen = Color(0xFF386A20)
-val SuccessGreenContainer = Color(0xFFB7F397)
+val SuccessGreen = Color(0xFF16A34A)
+val SuccessGreenContainer = Color(0xFFDCFCE7)
+val OnSuccessGreen = Color(0xFFFFFFFF)
+val OnSuccessGreenContainer = Color(0xFF14532D)
 
-// Player Avatar Colors (Distinct, vibrant Material 3 tones for up to 6 players)
+val BonusAmber = Color(0xFFD97706)
+val BonusAmberContainer = Color(0xFFFEF3C7)
+val OnBonusAmber = Color(0xFFFFFFFF)
+val OnBonusAmberContainer = Color(0xFF78350F)
+
+// Player Avatar Colors (Distinct, WCAG compliant vibrant tones for 6 players)
 val PlayerColors = listOf(
-    Color(0xFF6750A4), // Purple
-    Color(0xFF7D5260), // Rose/Plum
-    Color(0xFF386A20), // Olive/Green
-    Color(0xFF00639B), // Blue
-    Color(0xFF8C4E00), // Amber/Bronze
-    Color(0xFF805158)  // Crimson
+    Color(0xFFDC2626), // Crimson Red
+    Color(0xFF2563EB), // Royal Blue
+    Color(0xFF16A34A), // Emerald Green
+    Color(0xFFD97706), // Amber Orange
+    Color(0xFF7C3AED), // Violet Purple
+    Color(0xFF0D9488)  // Teal
 )
+

@@ -1,9 +1,12 @@
 package com.example.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.audio.SoundEffects
+import com.example.data.local.AppDatabase
+import com.example.data.local.UserProfileRepository
 import com.example.model.ADDITIONAL_CATEGORIES
 import com.example.model.AnswerScoreType
 import com.example.model.DEFAULT_CATEGORIES
@@ -58,6 +61,11 @@ data class StopUiState(
     // Map: playerId -> (category -> AnswerScoreType)
     val votingScores: Map<String, Map<String, AnswerScoreType>> = emptyMap(),
     val roundPointsEarned: Map<String, Int> = emptyMap(), // playerId -> points in round
+    // Laugh Emoji Reactions State:
+    // targetPlayerId -> (category -> list of voterPlayerIds)
+    val roundLaughVotes: Map<String, Map<String, List<String>>> = emptyMap(),
+    // Cumulative laugh votes received per player throughout tournament
+    val tournamentLaughs: Map<String, Int> = emptyMap(),
     
     // Notification Banner / Snackbar
     val bannerMessage: String? = null
@@ -67,6 +75,8 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
     private val discovery = NetworkDiscovery(application)
     private val networkManager = LocalNetworkManager()
     private val sounds = SoundEffects(application)
+    private val database = AppDatabase.getDatabase(application)
+    private val profileRepository = UserProfileRepository(database.userProfileDao())
 
     private val _uiState = MutableStateFlow(StopUiState())
     val uiState: StateFlow<StopUiState> = _uiState.asStateFlow()
@@ -85,9 +95,42 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
         )
         _uiState.update { it.copy(localPlayer = initialPlayer, players = listOf(initialPlayer)) }
 
+        loadSavedUserProfile()
         observeIncomingPackets()
         observeDiscoveredRooms()
         observeConnectionErrors()
+    }
+
+    private fun loadSavedUserProfile() {
+        viewModelScope.launch {
+            profileRepository.userProfile.collect { saved ->
+                if (saved != null) {
+                    _uiState.update { state ->
+                        val updatedLocal = state.localPlayer.copy(
+                            name = saved.name,
+                            colorIndex = saved.colorIndex,
+                            avatarUri = saved.avatarUri
+                        )
+                        val updatedPlayers = state.players.map { if (it.id == updatedLocal.id) updatedLocal else it }
+                        state.copy(
+                            localPlayer = updatedLocal,
+                            players = if (updatedPlayers.isEmpty()) listOf(updatedLocal) else updatedPlayers
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun persistCurrentProfile() {
+        viewModelScope.launch {
+            val current = _uiState.value.localPlayer
+            profileRepository.saveProfile(
+                name = current.name,
+                colorIndex = current.colorIndex,
+                avatarUri = current.avatarUri
+            )
+        }
     }
 
     private fun observeIncomingPackets() {
@@ -120,12 +163,18 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
     // --- HOME ACTIONS ---
 
     fun setPlayerName(name: String) {
-        val clean = name.trim().take(15)
+        val clean = name.take(15)
         _uiState.update { state ->
-            val updatedLocal = state.localPlayer.copy(name = if (clean.isNotEmpty()) clean else "Jugador")
+            val updatedLocal = state.localPlayer.copy(name = clean)
             val updatedPlayers = state.players.map { if (it.id == updatedLocal.id) updatedLocal else it }
             state.copy(localPlayer = updatedLocal, players = updatedPlayers)
         }
+        persistCurrentProfile()
+    }
+
+    private fun getEffectivePlayerName(): String {
+        val current = _uiState.value.localPlayer.name.trim()
+        return if (current.isNotEmpty()) current else "Jugador 1"
     }
 
     fun setPlayerColor(index: Int) {
@@ -134,12 +183,60 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
             val updatedPlayers = state.players.map { if (it.id == updatedLocal.id) updatedLocal else it }
             state.copy(localPlayer = updatedLocal, players = updatedPlayers)
         }
+        persistCurrentProfile()
+    }
+
+    fun setPlayerAvatarFromUri(uri: Uri?) {
+        viewModelScope.launch {
+            if (uri == null) {
+                setPlayerAvatar(null)
+                return@launch
+            }
+            try {
+                val context = getApplication<Application>()
+                val avatarsDir = java.io.File(context.filesDir, "avatars").apply { mkdirs() }
+                val avatarFile = java.io.File(avatarsDir, "profile_avatar.jpg")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    avatarFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                setPlayerAvatar(avatarFile.absolutePath)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun removePlayerAvatar() {
+        viewModelScope.launch {
+            try {
+                val context = getApplication<Application>()
+                val avatarFile = java.io.File(context.filesDir, "avatars/profile_avatar.jpg")
+                if (avatarFile.exists()) {
+                    avatarFile.delete()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            setPlayerAvatar(null)
+        }
+    }
+
+    private fun setPlayerAvatar(avatarUri: String?) {
+        _uiState.update { state ->
+            val updatedLocal = state.localPlayer.copy(avatarUri = avatarUri)
+            val updatedPlayers = state.players.map { if (it.id == updatedLocal.id) updatedLocal else it }
+            state.copy(localPlayer = updatedLocal, players = updatedPlayers)
+        }
+        persistCurrentProfile()
     }
 
     fun hostGame() {
         val code = discovery.generateRoomCode()
         val localIp = discovery.getLocalIpAddress()
-        val hostPlayer = _uiState.value.localPlayer.copy(isHost = true, score = 0)
+        val effectiveName = getEffectivePlayerName()
+        val hostPlayer = _uiState.value.localPlayer.copy(name = effectiveName, isHost = true, score = 0)
 
         _uiState.update {
             it.copy(
@@ -160,7 +257,8 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun startSoloWithBots() {
-        val hostPlayer = _uiState.value.localPlayer.copy(isHost = true, score = 0)
+        val effectiveName = getEffectivePlayerName()
+        val hostPlayer = _uiState.value.localPlayer.copy(name = effectiveName, isHost = true, score = 0)
         val bot1 = Player(id = "bot_1", name = "Sofi (Bot)", colorIndex = 1, isHost = false, isBot = true)
         val bot2 = Player(id = "bot_2", name = "Juan (Bot)", colorIndex = 2, isHost = false, isBot = true)
         val bot3 = Player(id = "bot_3", name = "Carla (Bot)", colorIndex = 3, isHost = false, isBot = true)
@@ -201,18 +299,22 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
             return
         }
 
+        val effectiveName = getEffectivePlayerName()
+        val joiningPlayer = _uiState.value.localPlayer.copy(name = effectiveName, isHost = false)
+
         _uiState.update {
             it.copy(
                 isHost = false,
                 isSoloOrBotsMode = false,
                 hostIp = cleanIp,
+                localPlayer = joiningPlayer,
                 connectionStatus = "Conectando a $cleanIp..."
             )
         }
 
         networkManager.connectToHost(cleanIp, port) { success ->
             if (success) {
-                val joinReq = NetworkPacket.createJoinRequest(_uiState.value.localPlayer.copy(isHost = false))
+                val joinReq = NetworkPacket.createJoinRequest(joiningPlayer)
                 networkManager.sendToHost(joinReq)
                 _uiState.update {
                     it.copy(
@@ -584,18 +686,38 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
+        // Simulate bot laugh reactions in solo/bots mode for extra amusement
+        val botLaughs = mutableMapOf<String, MutableMap<String, List<String>>>()
+        if (_uiState.value.isSoloOrBotsMode) {
+            val bots = _uiState.value.players.filter { it.isBot }
+            submissions.forEach { sub ->
+                categories.forEach { cat ->
+                    val word = sub.answers[cat]?.trim() ?: ""
+                    if (word.isNotEmpty()) {
+                        val reactingBots = bots.filter { it.id != sub.playerId && (1..100).random() <= 35 }
+                        if (reactingBots.isNotEmpty()) {
+                            val catMap = botLaughs.getOrPut(sub.playerId) { mutableMapOf() }
+                            catMap[cat] = reactingBots.map { it.id }
+                        }
+                    }
+                }
+            }
+        }
+
         _uiState.update {
             it.copy(
                 allRoundSubmissions = submissions,
                 votingScores = votes,
+                roundLaughVotes = botLaughs,
                 currentScreen = ScreenState.REVIEW_VOTING,
-                bannerMessage = "Revisa y califica las respuestas de cada jugador"
+                bannerMessage = "Revisa las respuestas. ¡Vota con 😂 si una te hace reír!"
             )
         }
 
         if (!_uiState.value.isSoloOrBotsMode && _uiState.value.isHost) {
             networkManager.broadcastToClients(NetworkPacket.createAllAnswersSync(submissions))
             broadcastScoresUpdate(votes)
+            broadcastLaughVotes(botLaughs, _uiState.value.tournamentLaughs)
         }
     }
 
@@ -613,6 +735,43 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun toggleLaughVote(targetPlayerId: String, category: String) {
+        val myId = _uiState.value.localPlayer.id
+        // The owner of the word is strictly prohibited from laugh-voting their own word
+        if (targetPlayerId == myId) {
+            _uiState.update { it.copy(bannerMessage = "No puedes votar 😂 por tu propia palabra") }
+            return
+        }
+
+        val currentRoundLaughs = _uiState.value.roundLaughVotes.toMutableMap()
+        val playerCatMap = (currentRoundLaughs[targetPlayerId] ?: emptyMap()).toMutableMap()
+        val currentVoters = (playerCatMap[category] ?: emptyList()).toMutableList()
+
+        val isAdding = if (currentVoters.contains(myId)) {
+            currentVoters.remove(myId)
+            false
+        } else {
+            currentVoters.add(myId)
+            true
+        }
+
+        playerCatMap[category] = currentVoters
+        currentRoundLaughs[targetPlayerId] = playerCatMap
+
+        _uiState.update { it.copy(roundLaughVotes = currentRoundLaughs) }
+        if (isAdding) {
+            sounds.playLaughReaction()
+        }
+
+        if (!_uiState.value.isSoloOrBotsMode) {
+            if (_uiState.value.isHost) {
+                broadcastLaughVotes(currentRoundLaughs, _uiState.value.tournamentLaughs)
+            } else {
+                networkManager.sendToHost(NetworkPacket.createLaughVoteToggle(targetPlayerId, category, myId))
+            }
+        }
+    }
+
     private fun broadcastScoresUpdate(votes: Map<String, Map<String, AnswerScoreType>>) {
         val root = JSONObject()
         votes.forEach { (pId, catMap) ->
@@ -623,17 +782,37 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
         networkManager.broadcastToClients(NetworkPacket.createVoteUpdate(root))
     }
 
+    private fun broadcastLaughVotes(
+        roundLaughs: Map<String, Map<String, List<String>>>,
+        tournLaughs: Map<String, Int>
+    ) {
+        networkManager.broadcastToClients(NetworkPacket.createLaughVotesSync(roundLaughs, tournLaughs))
+    }
+
     fun finishVotingAndShowSummary() {
         if (!_uiState.value.isHost) return
 
         val votes = _uiState.value.votingScores
         val roundPoints = mutableMapOf<String, Int>()
+        val currentTournLaughs = _uiState.value.tournamentLaughs.toMutableMap()
+
+        // Accumulate laugh votes gained in this round
+        val roundLaughMap = _uiState.value.roundLaughVotes
+        _uiState.value.players.forEach { player ->
+            val laughsInRound = roundLaughMap[player.id]?.values?.sumOf { it.size } ?: 0
+            val prev = currentTournLaughs[player.id] ?: 0
+            currentTournLaughs[player.id] = prev + laughsInRound
+        }
 
         val updatedPlayers = _uiState.value.players.map { player ->
             val playerVotes = votes[player.id] ?: emptyMap()
             val roundTotal = playerVotes.values.sumOf { it.points }
             roundPoints[player.id] = roundTotal
-            player.copy(score = player.score + roundTotal)
+            val totalLaughs = currentTournLaughs[player.id] ?: 0
+            player.copy(
+                score = player.score + roundTotal,
+                laughVotes = totalLaughs
+            )
         }
 
         val isFinal = _uiState.value.currentRoundNumber >= _uiState.value.gameConfig.totalRounds
@@ -643,11 +822,13 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
             it.copy(
                 players = updatedPlayers,
                 roundPointsEarned = roundPoints,
+                tournamentLaughs = currentTournLaughs,
                 currentScreen = nextScreen
             )
         }
 
         if (!_uiState.value.isSoloOrBotsMode) {
+            broadcastLaughVotes(roundLaughMap, currentTournLaughs)
             networkManager.broadcastToClients(
                 NetworkPacket.createRoundResults(updatedPlayers, _uiState.value.currentRoundNumber, isFinal)
             )
@@ -666,7 +847,7 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
 
     fun restartGame() {
         if (!_uiState.value.isHost) return
-        val resetPlayers = _uiState.value.players.map { it.copy(score = 0) }
+        val resetPlayers = _uiState.value.players.map { it.copy(score = 0, laughVotes = 0) }
         _uiState.update {
             it.copy(
                 players = resetPlayers,
@@ -674,7 +855,9 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
                 currentScreen = ScreenState.LOBBY,
                 roundPointsEarned = emptyMap(),
                 allRoundSubmissions = emptyList(),
-                votingScores = emptyMap()
+                votingScores = emptyMap(),
+                roundLaughVotes = emptyMap(),
+                tournamentLaughs = emptyMap()
             )
         }
 
@@ -694,10 +877,12 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
         _uiState.update {
             it.copy(
                 currentScreen = ScreenState.HOME,
-                players = listOf(it.localPlayer),
+                players = listOf(it.localPlayer.copy(score = 0, laughVotes = 0)),
                 isHost = false,
                 isSoloOrBotsMode = false,
-                availableRooms = emptyList()
+                availableRooms = emptyList(),
+                roundLaughVotes = emptyMap(),
+                tournamentLaughs = emptyMap()
             )
         }
     }
@@ -830,6 +1015,72 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
                     it.copy(
                         currentRoundNumber = 1,
                         currentScreen = ScreenState.LOBBY
+                    )
+                }
+            }
+            PacketType.LAUGH_VOTE_TOGGLE -> {
+                if (_uiState.value.isHost) {
+                    val targetId = packet.payload.getString("targetPlayerId")
+                    val category = packet.payload.getString("category")
+                    val voterId = packet.payload.getString("voterId")
+
+                    // Strictly forbid voting for one's own word
+                    if (targetId != voterId) {
+                        val currentRoundLaughs = _uiState.value.roundLaughVotes.toMutableMap()
+                        val playerCatMap = (currentRoundLaughs[targetId] ?: emptyMap()).toMutableMap()
+                        val currentVoters = (playerCatMap[category] ?: emptyList()).toMutableList()
+
+                        if (currentVoters.contains(voterId)) {
+                            currentVoters.remove(voterId)
+                        } else {
+                            currentVoters.add(voterId)
+                        }
+
+                        playerCatMap[category] = currentVoters
+                        currentRoundLaughs[targetId] = playerCatMap
+
+                        _uiState.update { it.copy(roundLaughVotes = currentRoundLaughs) }
+                        broadcastLaughVotes(currentRoundLaughs, _uiState.value.tournamentLaughs)
+                    }
+                }
+            }
+            PacketType.LAUGH_VOTES_SYNC -> {
+                val roundObj = packet.payload.optJSONObject("roundLaughVotes")
+                val roundMap = mutableMapOf<String, MutableMap<String, List<String>>>()
+                if (roundObj != null) {
+                    val targetKeys = roundObj.keys()
+                    while (targetKeys.hasNext()) {
+                        val tId = targetKeys.next()
+                        val catObj = roundObj.getJSONObject(tId)
+                        val catMap = mutableMapOf<String, List<String>>()
+                        val catKeys = catObj.keys()
+                        while (catKeys.hasNext()) {
+                            val c = catKeys.next()
+                            val arr = catObj.getJSONArray(c)
+                            val list = mutableListOf<String>()
+                            for (i in 0 until arr.length()) {
+                                list.add(arr.getString(i))
+                            }
+                            catMap[c] = list
+                        }
+                        roundMap[tId] = catMap
+                    }
+                }
+
+                val tournObj = packet.payload.optJSONObject("tournamentLaughs")
+                val tournMap = mutableMapOf<String, Int>()
+                if (tournObj != null) {
+                    val pKeys = tournObj.keys()
+                    while (pKeys.hasNext()) {
+                        val pId = pKeys.next()
+                        tournMap[pId] = tournObj.getInt(pId)
+                    }
+                }
+
+                _uiState.update {
+                    it.copy(
+                        roundLaughVotes = roundMap,
+                        tournamentLaughs = tournMap
                     )
                 }
             }

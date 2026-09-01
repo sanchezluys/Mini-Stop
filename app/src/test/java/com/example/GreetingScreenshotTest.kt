@@ -29,6 +29,8 @@ class GreetingScreenshotTest {
           uiState = StopUiState(),
           onNameChange = {},
           onColorChange = {},
+          onAvatarChange = {},
+          onRemoveAvatar = {},
           onHostClick = {},
           onJoinIpClick = {},
           onJoinRoomClick = {},

@@ -51,7 +51,6 @@ import com.example.ui.components.PlayerSlotCard
 import com.example.ui.components.RoomCodeBanner
 import com.example.ui.components.SleekButton
 import com.example.ui.components.SleekCategoryChip
-import com.example.ui.theme.PrimaryPurple
 import com.example.viewmodel.StopUiState
 
 @Composable
@@ -160,8 +159,8 @@ fun LobbyScreen(
                         Text(
                             text = if (uiState.players.size < 2 && !uiState.isSoloOrBotsMode) "Esperando..." else "Listo",
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = PrimaryPurple
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
 
@@ -248,7 +247,7 @@ fun LobbyScreen(
                                     modifier = Modifier
                                         .size(36.dp)
                                         .clip(CircleShape)
-                                        .background(PrimaryPurple)
+                                        .background(MaterialTheme.colorScheme.primary)
                                         .clickable { showCategoryDialog = true },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -263,8 +262,8 @@ fun LobbyScreen(
                                 Text(
                                     text = "Añadir o cambiar categorías",
                                     fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = PrimaryPurple,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.clickable { showCategoryDialog = true }
                                 )
                             }
@@ -418,7 +417,7 @@ fun LobbyScreen(
                                 val isSel = uiState.gameConfig.roundDurationSecs == secs
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
-                                    color = if (isSel) PrimaryPurple else MaterialTheme.colorScheme.surfaceVariant,
+                                    color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                                     modifier = Modifier.clickable { onSetRoundDuration(secs) }
                                 ) {
                                     Text(
@@ -446,7 +445,7 @@ fun LobbyScreen(
                                 val isSel = uiState.gameConfig.totalRounds == rounds
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
-                                    color = if (isSel) PrimaryPurple else MaterialTheme.colorScheme.surfaceVariant,
+                                    color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                                     modifier = Modifier.clickable { onSetTotalRounds(rounds) }
                                 ) {
                                     Text(
@@ -470,3 +469,4 @@ fun LobbyScreen(
         )
     }
 }
+

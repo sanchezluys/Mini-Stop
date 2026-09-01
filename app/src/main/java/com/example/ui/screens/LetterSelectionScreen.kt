@@ -16,13 +16,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -37,9 +33,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.OutlineColor
-import com.example.ui.theme.PrimaryContainer
-import com.example.ui.theme.PrimaryPurple
 import com.example.viewmodel.StopUiState
 
 @Composable
@@ -72,7 +65,7 @@ fun LetterSelectionScreen(
             // Round Badge
             Card(
                 shape = RoundedCornerShape(100.dp),
-                colors = CardDefaults.cardColors(containerColor = PrimaryContainer),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                 modifier = Modifier.testTag("round_indicator")
             ) {
                 Text(
@@ -94,14 +87,14 @@ fun LetterSelectionScreen(
                     .scale(if (uiState.isSpinning) pulseScale else 1f)
                     .clip(RoundedCornerShape(36.dp))
                     .background(MaterialTheme.colorScheme.surface)
-                    .border(2.dp, PrimaryPurple, RoundedCornerShape(36.dp)),
+                    .border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(36.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = uiState.spinningLetter.toString(),
                     fontSize = 100.sp,
                     fontWeight = FontWeight.Black,
-                    color = PrimaryPurple
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -123,3 +116,4 @@ fun LetterSelectionScreen(
         }
     }
 }
+

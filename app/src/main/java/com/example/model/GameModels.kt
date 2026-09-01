@@ -7,20 +7,26 @@ data class Player(
     val id: String,
     val name: String,
     val colorIndex: Int = 0,
+    val avatarUri: String? = null,
     val isHost: Boolean = false,
     val isReady: Boolean = true,
     val score: Int = 0,
-    val isBot: Boolean = false
+    val isBot: Boolean = false,
+    val laughVotes: Int = 0
 ) {
     fun toJsonObject(): JSONObject {
         return JSONObject().apply {
             put("id", id)
             put("name", name)
             put("colorIndex", colorIndex)
+            if (avatarUri != null) {
+                put("avatarUri", avatarUri)
+            }
             put("isHost", isHost)
             put("isReady", isReady)
             put("score", score)
             put("isBot", isBot)
+            put("laughVotes", laughVotes)
         }
     }
 
@@ -30,10 +36,12 @@ data class Player(
                 id = json.getString("id"),
                 name = json.getString("name"),
                 colorIndex = json.optInt("colorIndex", 0),
+                avatarUri = if (json.has("avatarUri") && !json.isNull("avatarUri")) json.getString("avatarUri") else null,
                 isHost = json.optBoolean("isHost", false),
                 isReady = json.optBoolean("isReady", true),
                 score = json.optInt("score", 0),
-                isBot = json.optBoolean("isBot", false)
+                isBot = json.optBoolean("isBot", false),
+                laughVotes = json.optInt("laughVotes", 0)
             )
         }
     }

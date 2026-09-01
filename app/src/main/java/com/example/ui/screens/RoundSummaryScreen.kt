@@ -19,10 +19,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,11 +33,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.PlayerAvatar
 import com.example.ui.components.SleekButton
-import com.example.ui.theme.OutlineColor
 import com.example.ui.theme.PlayerColors
-import com.example.ui.theme.PrimaryContainer
-import com.example.ui.theme.PrimaryPurple
 import com.example.ui.theme.SuccessGreen
 import com.example.viewmodel.StopUiState
 
@@ -66,7 +62,7 @@ fun RoundSummaryScreen(
             // Header Badge
             Card(
                 shape = RoundedCornerShape(100.dp),
-                colors = CardDefaults.cardColors(containerColor = PrimaryContainer)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
                 Text(
                     text = "RESUMEN DE RONDA ${uiState.currentRoundNumber}",
@@ -97,7 +93,7 @@ fun RoundSummaryScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 itemsIndexed(sortedPlayers) { index, player ->
-                    val color = PlayerColors.getOrElse(player.colorIndex) { PrimaryPurple }
+                    val color = PlayerColors.getOrElse(player.colorIndex) { MaterialTheme.colorScheme.primary }
                     val earnedInRound = uiState.roundPointsEarned[player.id] ?: 0
 
                     Card(
@@ -105,7 +101,7 @@ fun RoundSummaryScreen(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, OutlineColor, RoundedCornerShape(18.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(18.dp))
                     ) {
                         Row(
                             modifier = Modifier
@@ -120,26 +116,12 @@ fun RoundSummaryScreen(
                                     text = "#${index + 1}",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (index == 0) PrimaryPurple else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (index == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
 
                                 Spacer(modifier = Modifier.width(12.dp))
 
-                                // Avatar
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(color),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = player.name.take(2).uppercase(),
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                                PlayerAvatar(player = player, size = 36.dp)
 
                                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -150,12 +132,24 @@ fun RoundSummaryScreen(
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
-                                    Text(
-                                        text = "+$earnedInRound pts en esta ronda",
-                                        fontSize = 11.sp,
-                                        color = SuccessGreen,
-                                        fontWeight = FontWeight.Medium
-                                    )
+                                    val roundLaughs = uiState.roundLaughVotes[player.id]?.values?.sumOf { it.size } ?: 0
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "+$earnedInRound pts",
+                                            fontSize = 11.sp,
+                                            color = SuccessGreen,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        if (roundLaughs > 0) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "· 😂 +$roundLaughs",
+                                                fontSize = 11.sp,
+                                                color = Color(0xFFD97706),
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
@@ -199,3 +193,4 @@ fun RoundSummaryScreen(
         }
     }
 }
+

@@ -20,7 +20,9 @@ enum class PacketType {
     ROUND_RESULTS,
     NEXT_ROUND_TRIGGER,
     RESTART_GAME,
-    HEARTBEAT
+    HEARTBEAT,
+    LAUGH_VOTE_TOGGLE,
+    LAUGH_VOTES_SYNC
 }
 
 data class NetworkPacket(
@@ -127,6 +129,41 @@ data class NetworkPacket(
                 put("isGameOver", isGameOver)
             }
             return NetworkPacket(PacketType.ROUND_RESULTS, "", payload)
+        }
+
+        fun createLaughVoteToggle(targetPlayerId: String, category: String, voterId: String): NetworkPacket {
+            val payload = JSONObject().apply {
+                put("targetPlayerId", targetPlayerId)
+                put("category", category)
+                put("voterId", voterId)
+            }
+            return NetworkPacket(PacketType.LAUGH_VOTE_TOGGLE, voterId, payload)
+        }
+
+        fun createLaughVotesSync(
+            roundLaughVotes: Map<String, Map<String, List<String>>>,
+            tournamentLaughs: Map<String, Int>
+        ): NetworkPacket {
+            val root = JSONObject()
+            val roundObj = JSONObject()
+            roundLaughVotes.forEach { (targetId, catMap) ->
+                val catObj = JSONObject()
+                catMap.forEach { (cat, voters) ->
+                    val arr = JSONArray()
+                    voters.forEach { arr.put(it) }
+                    catObj.put(cat, arr)
+                }
+                roundObj.put(targetId, catObj)
+            }
+            root.put("roundLaughVotes", roundObj)
+
+            val tournObj = JSONObject()
+            tournamentLaughs.forEach { (pId, count) ->
+                tournObj.put(pId, count)
+            }
+            root.put("tournamentLaughs", tournObj)
+
+            return NetworkPacket(PacketType.LAUGH_VOTES_SYNC, "", root)
         }
     }
 }

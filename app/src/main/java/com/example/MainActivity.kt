@@ -48,6 +48,8 @@ class MainActivity : ComponentActivity() {
                                     uiState = uiState,
                                     onNameChange = { viewModel.setPlayerName(it) },
                                     onColorChange = { viewModel.setPlayerColor(it) },
+                                    onAvatarChange = { viewModel.setPlayerAvatarFromUri(it) },
+                                    onRemoveAvatar = { viewModel.removePlayerAvatar() },
                                     onHostClick = { viewModel.hostGame() },
                                     onJoinIpClick = { viewModel.joinByIp(it) },
                                     onJoinRoomClick = { viewModel.joinByRoom(it) },
@@ -84,6 +86,7 @@ class MainActivity : ComponentActivity() {
                                 VotingScreen(
                                     uiState = uiState,
                                     onScoreChange = { pId, cat, type -> viewModel.setAnswerVote(pId, cat, type) },
+                                    onLaughClick = { pId, cat -> viewModel.toggleLaughVote(pId, cat) },
                                     onFinishVotingClick = { viewModel.finishVotingAndShowSummary() }
                                 )
                             }
