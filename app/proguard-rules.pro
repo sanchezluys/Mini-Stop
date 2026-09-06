@@ -16,6 +16,13 @@
 # debugging stack traces.
 #-keepattributes SourceFile,LineNumberTable
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep data models and Room entities for JSON serialization and local persistence
+-keep class com.example.model.** { *; }
+-keep class com.example.data.local.** { *; }
+
+# Keep Network packet types and enums for socket JSON communication
+-keep class com.example.network.** { *; }
+-keepclassmembers enum com.example.network.PacketType { *; }
+
+# Coil image loading library
+-keep class coil.** { *; }
