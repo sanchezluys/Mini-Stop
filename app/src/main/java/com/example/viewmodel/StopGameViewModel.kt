@@ -84,6 +84,7 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
     private var roundTimerJob: Job? = null
     private var rouletteJob: Job? = null
     private var stopCountdownJob: Job? = null
+    private var currentHostPort: Int = NetworkDiscovery.DEFAULT_GAME_PORT
 
     init {
         // Initialize with default player
@@ -233,6 +234,7 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun hostGame() {
+        stopDiscovery()
         val code = discovery.generateRoomCode()
         val localIp = discovery.getLocalIpAddress()
         val effectiveName = getEffectivePlayerName()
@@ -252,8 +254,12 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
             )
         }
 
-        networkManager.startHost()
-        discovery.startBroadcasting(code, hostPlayer.name, 1, _uiState.value.gameConfig.maxPlayers)
+        networkManager.startHost { actualPort ->
+            currentHostPort = actualPort
+            val ipDisplay = if (actualPort != NetworkDiscovery.DEFAULT_GAME_PORT) "$localIp:$actualPort" else localIp
+            _uiState.update { it.copy(hostIp = ipDisplay) }
+            discovery.startBroadcasting(code, hostPlayer.name, 1, _uiState.value.gameConfig.maxPlayers, actualPort)
+        }
     }
 
     fun startSoloWithBots() {
@@ -292,12 +298,16 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
         joinByIp(room.hostIp, room.port)
     }
 
-    fun joinByIp(ip: String, port: Int = NetworkDiscovery.DEFAULT_GAME_PORT) {
-        val cleanIp = ip.trim()
-        if (cleanIp.isEmpty()) {
+    fun joinByIp(ipInput: String, defaultPort: Int = NetworkDiscovery.DEFAULT_GAME_PORT) {
+        val cleanInput = ipInput.trim()
+        if (cleanInput.isEmpty()) {
             _uiState.update { it.copy(bannerMessage = "Ingresa una dirección IP válida") }
             return
         }
+
+        val parts = cleanInput.split(":")
+        val cleanIp = parts[0].trim()
+        val port = if (parts.size > 1) parts[1].toIntOrNull() ?: defaultPort else defaultPort
 
         val effectiveName = getEffectivePlayerName()
         val joiningPlayer = _uiState.value.localPlayer.copy(name = effectiveName, isHost = false)
@@ -308,7 +318,7 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
                 isSoloOrBotsMode = false,
                 hostIp = cleanIp,
                 localPlayer = joiningPlayer,
-                connectionStatus = "Conectando a $cleanIp..."
+                connectionStatus = "Conectando a $cleanIp:$port..."
             )
         }
 
@@ -325,7 +335,7 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
                 }
             } else {
                 _uiState.update {
-                    it.copy(connectionStatus = "No se pudo conectar a $cleanIp", bannerMessage = "Error de conexión")
+                    it.copy(connectionStatus = "No se pudo conectar a $cleanIp:$port", bannerMessage = "Error de conexión")
                 }
             }
         }

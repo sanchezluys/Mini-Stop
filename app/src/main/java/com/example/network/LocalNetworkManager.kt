@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.ConcurrentHashMap
@@ -45,23 +46,55 @@ class LocalNetworkManager {
 
     // --- HOST METHODS ---
 
-    fun startHost(port: Int = NetworkDiscovery.DEFAULT_GAME_PORT) {
+    fun startHost(
+        preferredPort: Int = NetworkDiscovery.DEFAULT_GAME_PORT,
+        onPortBound: ((Int) -> Unit)? = null
+    ) {
         stopAll()
         isHostMode = true
 
         serverJob = scope.launch {
+            var boundSocket: ServerSocket? = null
             try {
-                serverSocket = ServerSocket(port).apply {
-                    reuseAddress = true
+                // Try preferred port first with SO_REUSEADDR properly enabled prior to binding.
+                // If the port is occupied or lingering in TIME_WAIT, try fallback ports or OS dynamic port.
+                val candidatePorts = intArrayOf(preferredPort, 8890, 8891, 8892, 0)
+                var lastException: Exception? = null
+
+                for (port in candidatePorts) {
+                    try {
+                        val s = ServerSocket()
+                        s.reuseAddress = true
+                        s.bind(InetSocketAddress(port))
+                        boundSocket = s
+                        break
+                    } catch (e: Exception) {
+                        lastException = e
+                    }
                 }
+
+                if (boundSocket == null) {
+                    throw (lastException ?: Exception("No se pudo enlazar ningún puerto de red"))
+                }
+
+                serverSocket = boundSocket
+                val actualPort = boundSocket.localPort
+
+                withContext(Dispatchers.Main) {
+                    onPortBound?.invoke(actualPort)
+                }
+
                 while (isActive) {
                     val socket = serverSocket?.accept() ?: break
+                    socket.tcpNoDelay = true
                     handleNewClient(socket)
                 }
             } catch (e: Exception) {
                 if (isActive) {
                     _connectionErrors.emit("Error en servidor: ${e.localizedMessage}")
                 }
+            } finally {
+                try { boundSocket?.close() } catch (_: Exception) {}
             }
         }
     }
@@ -169,6 +202,7 @@ class LocalNetworkManager {
 
         clientConnections.values.forEach {
             it.job.cancel()
+            try { it.writer.close() } catch (_: Exception) {}
             try { it.socket.close() } catch (_: Exception) {}
         }
         clientConnections.clear()

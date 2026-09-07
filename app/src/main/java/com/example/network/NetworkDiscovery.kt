@@ -14,6 +14,7 @@ import org.json.JSONObject
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.util.Collections
 
@@ -41,7 +42,13 @@ class NetworkDiscovery(private val context: Context) {
         const val DEFAULT_GAME_PORT = 8888
     }
 
-    fun startBroadcasting(roomCode: String, hostName: String, playerCount: Int, maxPlayers: Int) {
+    fun startBroadcasting(
+        roomCode: String,
+        hostName: String,
+        playerCount: Int,
+        maxPlayers: Int,
+        gamePort: Int = DEFAULT_GAME_PORT
+    ) {
         stopBroadcasting()
         broadcastJob = scope.launch {
             var socket: DatagramSocket? = null
@@ -56,7 +63,7 @@ class NetworkDiscovery(private val context: Context) {
                         put("roomCode", roomCode)
                         put("hostName", hostName)
                         put("hostIp", localIp)
-                        put("port", DEFAULT_GAME_PORT)
+                        put("port", gamePort)
                         put("playerCount", playerCount)
                         put("maxPlayers", maxPlayers)
                     }
@@ -96,8 +103,12 @@ class NetworkDiscovery(private val context: Context) {
         listenJob = scope.launch {
             var socket: DatagramSocket? = null
             try {
-                socket = DatagramSocket(DISCOVERY_PORT)
-                socket.broadcast = true
+                val dSocket = DatagramSocket(null).apply {
+                    reuseAddress = true
+                    broadcast = true
+                    bind(InetSocketAddress(DISCOVERY_PORT))
+                }
+                socket = dSocket
                 val buffer = ByteArray(2048)
 
                 while (isActive) {
