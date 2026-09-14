@@ -50,8 +50,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.Image
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
+import android.graphics.BitmapFactory
+import android.util.Base64
+import java.io.File
 import coil.compose.AsyncImage
 import com.example.model.Player
 import com.example.ui.theme.PlayerColors
@@ -66,6 +73,7 @@ fun PlayerAvatar(
         name = player.name,
         colorIndex = player.colorIndex,
         avatarUri = player.avatarUri,
+        avatarBase64 = player.avatarBase64,
         size = size,
         modifier = modifier
     )
@@ -76,11 +84,24 @@ fun PlayerAvatar(
     name: String,
     colorIndex: Int,
     avatarUri: String?,
+    avatarBase64: String? = null,
     size: Dp = 40.dp,
     modifier: Modifier = Modifier
 ) {
     val color = PlayerColors.getOrElse(colorIndex) { MaterialTheme.colorScheme.primary }
     val initials = if (name.isNotBlank()) name.trim().take(2).uppercase() else "TÚ"
+
+    val decodedBitmap: ImageBitmap? = remember(avatarBase64) {
+        if (!avatarBase64.isNullOrBlank()) {
+            try {
+                val bytes = Base64.decode(avatarBase64, Base64.DEFAULT)
+                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                bmp?.asImageBitmap()
+            } catch (_: Exception) {
+                null
+            }
+        } else null
+    }
 
     Box(
         modifier = modifier
@@ -89,22 +110,35 @@ fun PlayerAvatar(
             .background(color),
         contentAlignment = Alignment.Center
     ) {
-        if (!avatarUri.isNullOrBlank()) {
-            AsyncImage(
-                model = avatarUri,
-                contentDescription = "Foto de perfil",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-            )
-        } else {
-            Text(
-                text = initials,
-                color = Color.White,
-                fontSize = (size.value * 0.38f).sp,
-                fontWeight = FontWeight.Bold
-            )
+        when {
+            decodedBitmap != null -> {
+                Image(
+                    bitmap = decodedBitmap,
+                    contentDescription = "Foto de $name",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                )
+            }
+            !avatarUri.isNullOrBlank() && (avatarUri.startsWith("content://") || File(avatarUri).exists()) -> {
+                AsyncImage(
+                    model = avatarUri,
+                    contentDescription = "Foto de $name",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                )
+            }
+            else -> {
+                Text(
+                    text = initials,
+                    color = Color.White,
+                    fontSize = (size.value * 0.38f).sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

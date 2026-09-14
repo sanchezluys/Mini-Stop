@@ -87,7 +87,8 @@ class MainActivity : ComponentActivity() {
                                     uiState = uiState,
                                     onScoreChange = { pId, cat, type -> viewModel.setAnswerVote(pId, cat, type) },
                                     onLaughClick = { pId, cat -> viewModel.toggleLaughVote(pId, cat) },
-                                    onFinishVotingClick = { viewModel.finishVotingAndShowSummary() }
+                                    onFinishVotingClick = { viewModel.finishVotingAndShowSummary() },
+                                    onEditAnswer = { pId, cat, text -> viewModel.editAnswerText(pId, cat, text) }
                                 )
                             }
                             ScreenState.ROUND_SUMMARY -> {

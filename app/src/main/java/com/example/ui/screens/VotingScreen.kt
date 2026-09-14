@@ -22,18 +22,25 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,11 +64,57 @@ fun VotingScreen(
     onScoreChange: (playerId: String, category: String, scoreType: AnswerScoreType) -> Unit,
     onLaughClick: (playerId: String, category: String) -> Unit,
     onFinishVotingClick: () -> Unit,
+    onEditAnswer: ((playerId: String, category: String, newText: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val categories = uiState.gameConfig.categories
     var selectedCategoryIndex by remember { mutableIntStateOf(0) }
     val currentCategory = categories.getOrElse(selectedCategoryIndex) { categories.firstOrNull() ?: "" }
+
+    var editingTarget by remember { mutableStateOf<Triple<String, String, String>?>(null) }
+    var editDialogText by remember { mutableStateOf("") }
+
+    if (editingTarget != null) {
+        AlertDialog(
+            onDismissRequest = { editingTarget = null },
+            title = { Text("Editar respuesta", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text(
+                        text = "Corrige la palabra escrita por el jugador:",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = editDialogText,
+                        onValueChange = { editDialogText = it },
+                        label = { Text("Palabra corregida") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("edit_answer_input")
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        editingTarget?.let { (pId, cat, _) ->
+                            onEditAnswer?.invoke(pId, cat, editDialogText)
+                        }
+                        editingTarget = null
+                    },
+                    modifier = Modifier.testTag("confirm_edit_button")
+                ) {
+                    Text("Guardar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingTarget = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -224,57 +277,131 @@ fun VotingScreen(
                             Spacer(modifier = Modifier.height(8.dp))
 
                             // Submitted Word
-                            Box(
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
                                     text = if (answerText.isNotEmpty()) answerText else "(Sin respuesta)",
                                     fontSize = 16.sp,
                                     fontWeight = if (answerText.isNotEmpty()) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (answerText.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    color = if (answerText.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.weight(1f)
                                 )
+
+                                if (uiState.isHost) {
+                                    IconButton(
+                                        onClick = {
+                                            editingTarget = Triple(player.id, currentCategory, answerText)
+                                            editDialogText = answerText
+                                        },
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .testTag("edit_word_${player.id}_$currentCategory")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Editar palabra",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Score Action Buttons
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                // Unique +100
-                                ScorePillButton(
-                                    label = "+100 (Única)",
-                                    icon = Icons.Default.Check,
-                                    isSelected = currentScoreType == AnswerScoreType.UNIQUE,
-                                    selectedColor = SuccessGreen,
-                                    onClick = { onScoreChange(player.id, currentCategory, AnswerScoreType.UNIQUE) },
-                                    modifier = Modifier.weight(1f)
-                                )
+                            // Score Buttons (Host only can modify; other players see read-only status)
+                            if (uiState.isHost) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    // Unique +100
+                                    ScorePillButton(
+                                        label = "+100 (Única)",
+                                        icon = Icons.Default.Check,
+                                        isSelected = currentScoreType == AnswerScoreType.UNIQUE,
+                                        selectedColor = SuccessGreen,
+                                        onClick = { onScoreChange(player.id, currentCategory, AnswerScoreType.UNIQUE) },
+                                        modifier = Modifier.weight(1f)
+                                    )
 
-                                // Repeated +50
-                                ScorePillButton(
-                                    label = "+50 (Repetida)",
-                                    icon = Icons.Default.Repeat,
-                                    isSelected = currentScoreType == AnswerScoreType.REPEATED,
-                                    selectedColor = MaterialTheme.colorScheme.secondary,
-                                    onClick = { onScoreChange(player.id, currentCategory, AnswerScoreType.REPEATED) },
-                                    modifier = Modifier.weight(1f)
-                                )
+                                    // Repeated +50
+                                    ScorePillButton(
+                                        label = "+50 (Repetida)",
+                                        icon = Icons.Default.Repeat,
+                                        isSelected = currentScoreType == AnswerScoreType.REPEATED,
+                                        selectedColor = MaterialTheme.colorScheme.secondary,
+                                        onClick = { onScoreChange(player.id, currentCategory, AnswerScoreType.REPEATED) },
+                                        modifier = Modifier.weight(1f)
+                                    )
 
-                                // Invalid 0
-                                ScorePillButton(
-                                    label = "0 (Nula)",
-                                    icon = Icons.Default.Close,
-                                    isSelected = currentScoreType == AnswerScoreType.INVALID,
-                                    selectedColor = MaterialTheme.colorScheme.error,
-                                    onClick = { onScoreChange(player.id, currentCategory, AnswerScoreType.INVALID) },
-                                    modifier = Modifier.weight(1f)
-                                )
+                                    // Invalid 0
+                                    ScorePillButton(
+                                        label = "0 (Nula)",
+                                        icon = Icons.Default.Close,
+                                        isSelected = currentScoreType == AnswerScoreType.INVALID,
+                                        selectedColor = MaterialTheme.colorScheme.error,
+                                        onClick = { onScoreChange(player.id, currentCategory, AnswerScoreType.INVALID) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            } else {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = when (currentScoreType) {
+                                        AnswerScoreType.UNIQUE -> SuccessGreen.copy(alpha = 0.12f)
+                                        AnswerScoreType.REPEATED -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)
+                                        AnswerScoreType.INVALID -> MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = when (currentScoreType) {
+                                                    AnswerScoreType.UNIQUE -> Icons.Default.Check
+                                                    AnswerScoreType.REPEATED -> Icons.Default.Repeat
+                                                    AnswerScoreType.INVALID -> Icons.Default.Close
+                                                },
+                                                contentDescription = null,
+                                                tint = when (currentScoreType) {
+                                                    AnswerScoreType.UNIQUE -> SuccessGreen
+                                                    AnswerScoreType.REPEATED -> MaterialTheme.colorScheme.secondary
+                                                    AnswerScoreType.INVALID -> MaterialTheme.colorScheme.error
+                                                },
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "Puntaje anfitrión: ${currentScoreType.label} (+${currentScoreType.points} pts)",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = when (currentScoreType) {
+                                                    AnswerScoreType.UNIQUE -> SuccessGreen
+                                                    AnswerScoreType.REPEATED -> MaterialTheme.colorScheme.secondary
+                                                    AnswerScoreType.INVALID -> MaterialTheme.colorScheme.error
+                                                }
+                                            )
+                                        }
+                                        Text(
+                                            text = "Solo lectura",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(10.dp))

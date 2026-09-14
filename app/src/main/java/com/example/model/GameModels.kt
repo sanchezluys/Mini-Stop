@@ -8,6 +8,7 @@ data class Player(
     val name: String,
     val colorIndex: Int = 0,
     val avatarUri: String? = null,
+    val avatarBase64: String? = null,
     val isHost: Boolean = false,
     val isReady: Boolean = true,
     val score: Int = 0,
@@ -21,6 +22,9 @@ data class Player(
             put("colorIndex", colorIndex)
             if (avatarUri != null) {
                 put("avatarUri", avatarUri)
+            }
+            if (avatarBase64 != null) {
+                put("avatarBase64", avatarBase64)
             }
             put("isHost", isHost)
             put("isReady", isReady)
@@ -37,6 +41,7 @@ data class Player(
                 name = json.getString("name"),
                 colorIndex = json.optInt("colorIndex", 0),
                 avatarUri = if (json.has("avatarUri") && !json.isNull("avatarUri")) json.getString("avatarUri") else null,
+                avatarBase64 = if (json.has("avatarBase64") && !json.isNull("avatarBase64")) json.getString("avatarBase64") else null,
                 isHost = json.optBoolean("isHost", false),
                 isReady = json.optBoolean("isReady", true),
                 score = json.optInt("score", 0),

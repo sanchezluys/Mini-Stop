@@ -1,7 +1,9 @@
 package com.example.viewmodel
 
 import android.app.Application
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Base64
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.audio.SoundEffects
@@ -30,6 +32,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.util.UUID
 
 data class StopUiState(
@@ -50,6 +54,7 @@ data class StopUiState(
     val currentLetter: Char = 'A',
     val spinningLetter: Char = 'A',
     val isSpinning: Boolean = false,
+    val usedLetters: List<Char> = emptyList(), // Never repeat letters in rounds
     val remainingTimeSeconds: Int = 60,
     val isTimerActive: Boolean = false,
     val playerInputs: Map<String, String> = emptyMap(), // category -> typed word
@@ -102,15 +107,46 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
         observeConnectionErrors()
     }
 
+    private fun generateAvatarThumbnailBase64(file: File): String? {
+        return try {
+            if (!file.exists()) return null
+            val boundsOptions = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            BitmapFactory.decodeFile(file.absolutePath, boundsOptions)
+            val maxDim = maxOf(boundsOptions.outWidth, boundsOptions.outHeight)
+            var sampleSize = 1
+            while (maxDim / sampleSize > 160) {
+                sampleSize *= 2
+            }
+            val decodeOptions = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+            }
+            val originalBitmap = BitmapFactory.decodeFile(file.absolutePath, decodeOptions) ?: return null
+            val scaled = android.graphics.Bitmap.createScaledBitmap(originalBitmap, 128, 128, true)
+            val baos = ByteArrayOutputStream()
+            scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, baos)
+            val bytes = baos.toByteArray()
+            Base64.encodeToString(bytes, Base64.NO_WRAP)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun loadSavedUserProfile() {
         viewModelScope.launch {
             profileRepository.userProfile.collect { saved ->
                 if (saved != null) {
+                    val base64 = if (!saved.avatarUri.isNullOrBlank()) {
+                        generateAvatarThumbnailBase64(File(saved.avatarUri))
+                    } else null
+
                     _uiState.update { state ->
                         val updatedLocal = state.localPlayer.copy(
                             name = saved.name,
                             colorIndex = saved.colorIndex,
-                            avatarUri = saved.avatarUri
+                            avatarUri = saved.avatarUri,
+                            avatarBase64 = base64
                         )
                         val updatedPlayers = state.players.map { if (it.id == updatedLocal.id) updatedLocal else it }
                         state.copy(
@@ -190,19 +226,20 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
     fun setPlayerAvatarFromUri(uri: Uri?) {
         viewModelScope.launch {
             if (uri == null) {
-                setPlayerAvatar(null)
+                setPlayerAvatar(null, null)
                 return@launch
             }
             try {
                 val context = getApplication<Application>()
-                val avatarsDir = java.io.File(context.filesDir, "avatars").apply { mkdirs() }
-                val avatarFile = java.io.File(avatarsDir, "profile_avatar.jpg")
+                val avatarsDir = File(context.filesDir, "avatars").apply { mkdirs() }
+                val avatarFile = File(avatarsDir, "profile_avatar.jpg")
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     avatarFile.outputStream().use { output ->
                         input.copyTo(output)
                     }
                 }
-                setPlayerAvatar(avatarFile.absolutePath)
+                val base64 = generateAvatarThumbnailBase64(avatarFile)
+                setPlayerAvatar(avatarFile.absolutePath, base64)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -213,24 +250,33 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             try {
                 val context = getApplication<Application>()
-                val avatarFile = java.io.File(context.filesDir, "avatars/profile_avatar.jpg")
+                val avatarFile = File(context.filesDir, "avatars/profile_avatar.jpg")
                 if (avatarFile.exists()) {
                     avatarFile.delete()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-            setPlayerAvatar(null)
+            setPlayerAvatar(null, null)
         }
     }
 
-    private fun setPlayerAvatar(avatarUri: String?) {
+    private fun setPlayerAvatar(avatarUri: String?, avatarBase64: String?) {
         _uiState.update { state ->
-            val updatedLocal = state.localPlayer.copy(avatarUri = avatarUri)
+            val updatedLocal = state.localPlayer.copy(avatarUri = avatarUri, avatarBase64 = avatarBase64)
             val updatedPlayers = state.players.map { if (it.id == updatedLocal.id) updatedLocal else it }
             state.copy(localPlayer = updatedLocal, players = updatedPlayers)
         }
         persistCurrentProfile()
+
+        val currentState = _uiState.value
+        if (!currentState.isSoloOrBotsMode) {
+            if (currentState.isHost) {
+                networkManager.broadcastToClients(NetworkPacket.createPlayerListUpdate(currentState.players))
+            } else {
+                networkManager.sendToHost(NetworkPacket.createJoinRequest(currentState.localPlayer))
+            }
+        }
     }
 
     fun hostGame() {
@@ -279,6 +325,7 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
                 players = listOf(hostPlayer, bot1, bot2, bot3),
                 currentScreen = ScreenState.LOBBY,
                 currentRoundNumber = 1,
+                usedLetters = emptyList(),
                 bannerMessage = "Modo con Bots iniciado. ¡Listo para jugar!"
             )
         }
@@ -446,19 +493,25 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
             return
         }
 
-        // Reset all player scores
+        // Reset all player scores and clear used letters for new match
         val resetPlayers = _uiState.value.players.map { it.copy(score = 0) }
-        _uiState.update { it.copy(players = resetPlayers, currentRoundNumber = 1) }
+        _uiState.update { it.copy(players = resetPlayers, currentRoundNumber = 1, usedLetters = emptyList()) }
 
         startRouletteForRound(1)
     }
 
     private fun startRouletteForRound(roundNumber: Int) {
-        val selectedLetter = GAME_LETTERS.random()
+        val currentUsed = _uiState.value.usedLetters
+        val availableLetters = GAME_LETTERS.filterNot { it in currentUsed }
+        val pool = if (availableLetters.isNotEmpty()) availableLetters else GAME_LETTERS
+        val selectedLetter = pool.random()
+        val updatedUsed = (currentUsed + selectedLetter).distinct()
+
         _uiState.update {
             it.copy(
                 currentRoundNumber = roundNumber,
                 currentLetter = selectedLetter,
+                usedLetters = updatedUsed,
                 currentScreen = ScreenState.LETTER_ROULETTE,
                 isSpinning = true,
                 playerInputs = emptyMap(),
@@ -732,6 +785,9 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun setAnswerVote(playerId: String, category: String, scoreType: AnswerScoreType) {
+        // Strictly only the host can change or edit scores
+        if (!_uiState.value.isHost) return
+
         val currentVotes = _uiState.value.votingScores.toMutableMap()
         val playerVotes = currentVotes[playerId]?.toMutableMap() ?: mutableMapOf()
         playerVotes[category] = scoreType
@@ -742,6 +798,26 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
 
         if (!_uiState.value.isSoloOrBotsMode && _uiState.value.isHost) {
             broadcastScoresUpdate(currentVotes)
+        }
+    }
+
+    fun editAnswerText(playerId: String, category: String, newText: String) {
+        // Strictly only the host can edit submitted answers
+        if (!_uiState.value.isHost) return
+
+        val trimmed = newText.trim()
+        val updatedSubmissions = _uiState.value.allRoundSubmissions.map { sub ->
+            if (sub.playerId == playerId) {
+                val newAnswers = sub.answers.toMutableMap()
+                newAnswers[category] = trimmed
+                sub.copy(answers = newAnswers)
+            } else sub
+        }
+
+        _uiState.update { it.copy(allRoundSubmissions = updatedSubmissions) }
+
+        if (!_uiState.value.isSoloOrBotsMode && _uiState.value.isHost) {
+            networkManager.broadcastToClients(NetworkPacket.createAllAnswersSync(updatedSubmissions))
         }
     }
 
@@ -863,6 +939,7 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
                 players = resetPlayers,
                 currentRoundNumber = 1,
                 currentScreen = ScreenState.LOBBY,
+                usedLetters = emptyList(),
                 roundPointsEarned = emptyMap(),
                 allRoundSubmissions = emptyList(),
                 votingScores = emptyMap(),
@@ -1024,7 +1101,8 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update {
                     it.copy(
                         currentRoundNumber = 1,
-                        currentScreen = ScreenState.LOBBY
+                        currentScreen = ScreenState.LOBBY,
+                        usedLetters = emptyList()
                     )
                 }
             }

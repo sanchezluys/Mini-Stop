@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -53,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -78,6 +80,7 @@ fun HomeScreen(
     onStartDiscovery: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var showJoinDialog by remember { mutableStateOf(false) }
     var manualIpText by remember { mutableStateOf("") }
 
@@ -363,6 +366,41 @@ fun HomeScreen(
                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     onClick = onSoloBotsClick,
                     modifier = Modifier.testTag("solo_bots_button")
+                )
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Footer with dynamic version and developer info
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 20.dp)
+                    .testTag("app_footer"),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Versión ${com.example.BuildConfig.VERSION_NAME}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                )
+                Text(
+                    text = "Desarrollador: sanchezluys@gmail.com",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .testTag("developer_contact")
+                        .clickable {
+                            try {
+                                val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                    data = Uri.parse("mailto:sanchezluys@gmail.com")
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        }
                 )
             }
         }
