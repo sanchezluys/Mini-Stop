@@ -18,10 +18,30 @@ class StopGameProductionQATest {
 
     @Test
     fun qa_version_and_developer_metadata_test() {
-        assertEquals("7.0", BuildConfig.VERSION_NAME)
-        assertEquals(7, BuildConfig.VERSION_CODE)
+        assertEquals("8.0", BuildConfig.VERSION_NAME)
+        assertEquals(8, BuildConfig.VERSION_CODE)
         val devEmail = "sanchezluys@gmail.com"
         assertTrue("Developer email must be valid", devEmail.contains("@") && devEmail.endsWith(".com"))
+    }
+
+    @Test
+    fun qa_camera_permission_and_fileprovider_configuration_test() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val pm = context.packageManager
+        val packageInfo = pm.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_PERMISSIONS)
+        val requested = packageInfo.requestedPermissions ?: emptyArray()
+
+        assertTrue("Manifest must declare CAMERA permission", requested.contains(android.Manifest.permission.CAMERA))
+
+        // Verify FileProvider can generate URI for camera cache without exception
+        val cacheDir = java.io.File(context.cacheDir, "camera_photos").apply { mkdirs() }
+        val testPhoto = java.io.File(cacheDir, "test_camera_photo.jpg").apply { writeText("test_bytes") }
+        val authority = "${context.packageName}.fileprovider"
+
+        val photoUri = androidx.core.content.FileProvider.getUriForFile(context, authority, testPhoto)
+        assertNotNull("FileProvider must generate a valid URI", photoUri)
+        assertTrue("URI must use content scheme", photoUri.scheme == "content")
+        assertTrue("URI must contain authority", photoUri.authority == authority)
     }
 
     @Test

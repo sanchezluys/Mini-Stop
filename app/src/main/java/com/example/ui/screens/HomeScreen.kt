@@ -1,7 +1,11 @@
 package com.example.ui.screens
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,6 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
@@ -49,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,11 +66,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.example.network.DiscoveredRoom
 import com.example.ui.components.PlayerAvatar
 import com.example.ui.components.SleekButton
 import com.example.ui.theme.PlayerColors
 import com.example.viewmodel.StopUiState
+import java.io.File
 
 @Composable
 fun HomeScreen(
@@ -82,6 +91,9 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     var showJoinDialog by remember { mutableStateOf(false) }
+    var showPhotoSourceDialog by remember { mutableStateOf(false) }
+    var showPermissionRationaleDialog by remember { mutableStateOf(false) }
+    var tempCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
     var manualIpText by remember { mutableStateOf("") }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -89,6 +101,52 @@ fun HomeScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             onAvatarChange(uri)
+        }
+    }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success: Boolean ->
+        if (success) {
+            val uriStr = tempCameraUriString
+            if (!uriStr.isNullOrBlank()) {
+                val uri = Uri.parse(uriStr)
+                onAvatarChange(uri)
+            }
+        }
+    }
+
+    fun launchCameraCapture() {
+        try {
+            val cacheDir = File(context.cacheDir, "camera_photos").apply { mkdirs() }
+            val photoFile = File(cacheDir, "avatar_capture_${System.currentTimeMillis()}.jpg")
+            val authority = "${context.packageName}.fileprovider"
+            val photoUri = FileProvider.getUriForFile(context, authority, photoFile)
+            tempCameraUriString = photoUri.toString()
+            takePictureLauncher.launch(photoUri)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(context, "No se pudo iniciar la cámara: ${e.localizedMessage ?: e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            launchCameraCapture()
+        } else {
+            showPermissionRationaleDialog = true
+        }
+    }
+
+    fun handleCameraRequest() {
+        val permission = Manifest.permission.CAMERA
+        val isGranted = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        if (isGranted) {
+            launchCameraCapture()
+        } else {
+            cameraPermissionLauncher.launch(permission)
         }
     }
 
@@ -189,14 +247,12 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // Interactive Avatar with photo picker
+                        // Interactive Avatar with photo picker and camera dialog
                         Box(
                             modifier = Modifier
                                 .size(56.dp)
                                 .clickable {
-                                    photoPickerLauncher.launch(
-                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                    )
+                                    showPhotoSourceDialog = true
                                 }
                                 .testTag("avatar_picker_button"),
                             contentAlignment = Alignment.BottomEnd
@@ -205,6 +261,7 @@ fun HomeScreen(
                                 name = uiState.localPlayer.name,
                                 colorIndex = uiState.localPlayer.colorIndex,
                                 avatarUri = uiState.localPlayer.avatarUri,
+                                avatarBase64 = uiState.localPlayer.avatarBase64,
                                 size = 56.dp
                             )
 
@@ -245,7 +302,7 @@ fun HomeScreen(
                         )
                     }
 
-                    // Avatar action buttons
+                    // Avatar action buttons: Camera & Gallery & Remove
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -254,22 +311,44 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         OutlinedButton(
+                            onClick = { handleCameraRequest() },
+                            shape = RoundedCornerShape(100.dp),
+                            modifier = Modifier
+                                .height(34.dp)
+                                .testTag("camera_photo_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PhotoCamera,
+                                contentDescription = "Tomar foto con cámara",
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Cámara",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        OutlinedButton(
                             onClick = {
                                 photoPickerLauncher.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )
                             },
                             shape = RoundedCornerShape(100.dp),
-                            modifier = Modifier.height(32.dp).testTag("select_photo_button")
+                            modifier = Modifier
+                                .height(34.dp)
+                                .testTag("select_photo_button")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.AddPhotoAlternate,
-                                contentDescription = null,
+                                contentDescription = "Elegir de galería",
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (uiState.localPlayer.avatarUri != null) "Cambiar foto" else "Elegir foto",
+                                text = "Galería",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -279,7 +358,9 @@ fun HomeScreen(
                             TextButton(
                                 onClick = onRemoveAvatar,
                                 shape = RoundedCornerShape(100.dp),
-                                modifier = Modifier.height(32.dp).testTag("remove_photo_button")
+                                modifier = Modifier
+                                    .height(34.dp)
+                                    .testTag("remove_photo_button")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
@@ -289,7 +370,7 @@ fun HomeScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Quitar foto",
+                                    text = "Quitar",
                                     color = MaterialTheme.colorScheme.error,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -526,6 +607,243 @@ fun HomeScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showJoinDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Dialog to choose between Camera and Gallery
+    if (showPhotoSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showPhotoSourceDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Foto de Perfil",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Elige una opción para tu foto de perfil:",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Option: Camera
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showPhotoSourceDialog = false
+                                handleCameraRequest()
+                            }
+                            .testTag("dialog_option_camera")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PhotoCamera,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Tomar foto con la cámara",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Solicita permiso de cámara si no ha sido concedido",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Option: Gallery
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showPhotoSourceDialog = false
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            }
+                            .testTag("dialog_option_gallery")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AddPhotoAlternate,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Elegir de la galería",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Selecciona de tus imágenes guardadas",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Option: Remove
+                    if (uiState.localPlayer.avatarUri != null) {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showPhotoSourceDialog = false
+                                    onRemoveAvatar()
+                                }
+                                .testTag("dialog_option_remove")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Quitar foto actual",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPhotoSourceDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Permission Rationale & Resolution Dialog
+    if (showPermissionRationaleDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionRationaleDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.PhotoCamera,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Permiso de Cámara Requerido",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Para tomar una foto de perfil directamente desde la aplicación, Stop! necesita acceso a la cámara.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Si denegaste el permiso o marcaste 'no volver a preguntar', puedes concederlo fácilmente en los Ajustes del dispositivo.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPermissionRationaleDialog = false
+                        try {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                ) {
+                    Text("Abrir Ajustes", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPermissionRationaleDialog = false }) {
                     Text("Cancelar")
                 }
             }

@@ -233,13 +233,38 @@ class StopGameViewModel(application: Application) : AndroidViewModel(application
                 val context = getApplication<Application>()
                 val avatarsDir = File(context.filesDir, "avatars").apply { mkdirs() }
                 val avatarFile = File(avatarsDir, "profile_avatar.jpg")
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    avatarFile.outputStream().use { output ->
-                        input.copyTo(output)
+
+                var copied = false
+                try {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        avatarFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                        copied = true
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                if (!copied) {
+                    val rawPath = uri.path
+                    if (rawPath != null) {
+                        val sourceFile = File(rawPath)
+                        if (sourceFile.exists()) {
+                            sourceFile.inputStream().use { input ->
+                                avatarFile.outputStream().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            copied = true
+                        }
                     }
                 }
-                val base64 = generateAvatarThumbnailBase64(avatarFile)
-                setPlayerAvatar(avatarFile.absolutePath, base64)
+
+                if (avatarFile.exists() && avatarFile.length() > 0) {
+                    val base64 = generateAvatarThumbnailBase64(avatarFile)
+                    setPlayerAvatar(avatarFile.absolutePath, base64)
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
