@@ -18,10 +18,29 @@ class StopGameProductionQATest {
 
     @Test
     fun qa_version_and_developer_metadata_test() {
-        assertEquals("8.0", BuildConfig.VERSION_NAME)
-        assertEquals(8, BuildConfig.VERSION_CODE)
+        assertEquals("9.0", BuildConfig.VERSION_NAME)
+        assertEquals(9, BuildConfig.VERSION_CODE)
         val devEmail = "sanchezluys@gmail.com"
         assertTrue("Developer email must be valid", devEmail.contains("@") && devEmail.endsWith(".com"))
+    }
+
+    @Test
+    fun qa_edge_to_edge_and_fragment_sdk_test() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        
+        // 1. Verify androidx.fragment is modern (1.8.6)
+        val fragmentClass = Class.forName("androidx.fragment.app.Fragment")
+        assertNotNull("Modern androidx.fragment.app.Fragment must be present", fragmentClass)
+
+        // 2. Verify Activity windowSoftInputMode is adjustResize
+        val pm = context.packageManager
+        val activityInfo = pm.getActivityInfo(
+            android.content.ComponentName(context, MainActivity::class.java),
+            0
+        )
+        val isAdjustResize = (activityInfo.softInputMode and android.view.WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST) == 
+                android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        assertTrue("MainActivity must have windowSoftInputMode adjustResize for Edge-to-Edge", isAdjustResize)
     }
 
     @Test
